@@ -10,17 +10,27 @@ add two (if you have two ISP connections) routing tables in /etc/iproute2/rt_tab
 i.e
 
 252     isp1
+
 251     isp2
 
 In my scenario eth1 and eth2 are the interfaces connected to the ISP and the ip confiugred are:
+
 isp1_interface=eth1
+
 isp1_ip->10.4.0.146
+
 isp1_netmask=255.255.255.0
+
 isp1_gw->10.4.0.1
+
 isp2_interface=eth2
+
 isp2_ip->192.168.124.2
+
 isp2_netmask=255.255.255.0
+
 isp2_gw=192.168.124.1
+
 lan_int=eth0
 
 #add routes to the routing tables
