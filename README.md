@@ -56,7 +56,7 @@ For example,let's send out from isp2 the http traffic that comes from 192.168.12
 
 iptables -t mangle -A PREROUTING -i $lan_int -m state --state ESTABLISHED,RELATED -m connmark ! --mark 0 -j CONNMARK --restore-mark
 
-iptables -t mangle -A PREROUTING -s $lan_subnet ! -d lan_subnet -p tcp --dport 80 -m state --state NEW -m connmark --mark 0 -j MARK --set-mark 251
+iptables -t mangle -A PREROUTING -s $lan_subnet -p tcp --dport 80 -m state --state NEW -m connmark --mark 0 -j MARK --set-mark 251
 
 iptables -t mangle -A PREROUTING -m state --state NEW -m mark ! --mark 0 -j CONNMARK --save-mark
 
