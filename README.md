@@ -50,7 +50,7 @@ ip rule add from $isp2_ip table isp2
 
 
 now,if you want to send out from a specific interface some traffic you may use iptables.
-For example,let's send out from isp2 the http traffic
+For example,let's send out from isp2 the http traffic that comes from 192.168.122.0/24 (subnet defined for the lan)
 
 iptables -t mangle -A PREROUTING -i $lan_int -m state --state ESTABLISHED,RELATED -m connmark ! --mark 0 -j CONNMARK --restore-mark
 
