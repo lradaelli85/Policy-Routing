@@ -14,8 +14,8 @@ ip rule add fwmark 251 table isp2
 sysctl -w net.ipv4.ip_forward=1
 echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
 
-iptables -t nat -A POSTROUTING -o eth2 -j MASQUERADE
-iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE
+iptables -t nat -A POSTROUTING -o $isp2_interface -j MASQUERADE
+iptables -t nat -A POSTROUTING -o $isp1_interface -j MASQUERADE
 
 iptables -t mangle -A PREROUTING -i $lan_int -m state --state ESTABLISHED,RELATED -m connmark ! --mark 0 -j CONNMARK --restore-mark
 iptables -t mangle -A PREROUTING -s $lan_subnet -p tcp --dport 80 -m state --state NEW -m connmark --mark 0 -j MARK --set-mark 251
