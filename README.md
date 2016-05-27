@@ -33,6 +33,8 @@ isp2_gw=192.168.124.1
 
 lan_int=eth0
 
+lan_subnet=192.168.122.0/24
+
 #add routes to the routing tables
 
 ip route add $isp1_network dev $isp1_interface src $isp1_ip table isp1
@@ -54,11 +56,11 @@ For example,let's send out from isp2 the http traffic that comes from 192.168.12
 
 iptables -t mangle -A PREROUTING -i $lan_int -m state --state ESTABLISHED,RELATED -m connmark ! --mark 0 -j CONNMARK --restore-mark
 
-iptables -t mangle -A PREROUTING -s 192.168.122.0/24 ! -d 192.168.122.0/24 -p tcp --dport 80 -m state --state NEW -m connmark --mark 0 -j MARK --set-mark 251
+iptables -t mangle -A PREROUTING -s $lan_subnet ! -d lan_subnet -p tcp --dport 80 -m state --state NEW -m connmark --mark 0 -j MARK --set-mark 251
 
 iptables -t mangle -A PREROUTING -m state --state NEW -m mark ! --mark 0 -j CONNMARK --save-mark
 
-this is valid if the connection from the $lan_net subnet direct to anything that is not a local destination.
+this is valid if the connection from the $lan_subnet  direct to anything that is not a local destination.
 Then add a routing rule that lookup in the ips table if the fwmark match
 ip rule add fwmark 251 table isp2
 
