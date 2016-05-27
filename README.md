@@ -10,7 +10,6 @@ add two (if you have two ISP connections) routing tables in /etc/iproute2/rt_tab
 i.e
 
 252     isp1
-
 251     isp2
 
 In my scenario eth1 and eth2 are the interfaces connected to the ISP and the ip confiugred are:
