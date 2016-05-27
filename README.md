@@ -77,7 +77,7 @@ and to disable the rp_filter,otherwise could happen that some packets will be dr
 echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
 
 
--USAGE
+#USAGE
 
 you'll find a bash script ,that will do what i mentioned above.
 All paramters are read from a conmfiugration file.
