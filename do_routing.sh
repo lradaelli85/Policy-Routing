@@ -17,6 +17,7 @@ echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
 iptables -t nat -A POSTROUTING -o $isp2_interface -j MASQUERADE
 iptables -t nat -A POSTROUTING -o $isp1_interface -j MASQUERADE
 
-iptables -t mangle -A PREROUTING -i $lan_int -m state --state ESTABLISHED,RELATED -m connmark ! --mark 0 -j CONNMARK --restore-mark
-iptables -t mangle -A PREROUTING -s $lan_subnet -p tcp --dport 80 -m state --state NEW -m connmark --mark 0 -j MARK --set-mark 251
-iptables -t mangle -A PREROUTING -m state --state NEW -m mark ! --mark 0 -j CONNMARK --save-mark
+iptables -t mangle -A PREROUTING -s $lan_subnet -m conntrack ! --ctstate NEW -m connmark ! --mark 0 -j CONNMARK --restore-mark
+iptables -t mangle -A PREROUTING -s $lan_subnet -p tcp --dport 80 -m conntrack --ctstate NEW -m connmark --mark 0 -j MARK --set-mark 251
+iptables -t mangle -A PREROUTING -s $lan_subnet -p icmp --icmp-type echo-request -m connmark --mark 0 -j MARK --set-mark 251
+iptables -t mangle -A PREROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
