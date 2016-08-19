@@ -61,6 +61,8 @@ echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
 iptables -t nat -A POSTROUTING -o $isp1_interface -j MASQUERADE
 iptables -t nat -A POSTROUTING -o $isp2_interface -j MASQUERADE
 add_local
+iptables -t mangle -A ROUTING -m conntrack --ctstate NEW -i $isp1_interface -j RETURN
+iptables -t mangle -A ROUTING -m conntrack --ctstate NEW -i $isp2_interface -j RETURN
 iptables -t mangle -A ROUTING -m conntrack ! --ctstate NEW -m connmark --mark 250 -j RETURN
 iptables -t mangle -A ROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0  -j CONNMARK --restore-mark
 iptables -t mangle -A ROUTING -s $lan_subnet -p tcp --dport 80 -m conntrack --ctstate NEW -m connmark --mark 0 -j MARK --set-mark 251
