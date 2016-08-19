@@ -4,7 +4,7 @@
 stop(){
 ip route flush table $routing_table1
 ip route flush table $routing_table2
-
+ip rule del from all to $lan_subnet table main
 ip rule del from $isp1_ip table $routing_table1
 ip rule del from $isp2_ip table $routing_table2
 ip rule del fwmark 251 table $routing_table2
@@ -19,12 +19,10 @@ ip route add $isp1_network dev $isp1_interface src $isp1_ip table $routing_table
 ip route add default via $isp1_gw table $routing_table1
 ip route add $isp2_network dev $isp2_interface src $isp2_ip table $routing_table2
 ip route add default via $isp2_gw table $routing_table2
-
-
-
-ip rule add from $isp1_ip table $routing_table1 
-ip rule add from $isp2_ip table $routing_table2 
-ip rule add fwmark 251 table $routing_table2 
+ip rule add from all to $lan_subnet table main prio 198
+ip rule add from $isp1_ip table $routing_table1 prio 200
+ip rule add from $isp2_ip table $routing_table2 prio 200
+ip rule add fwmark 251 table $routing_table2 prio 199
 
 sysctl -w net.ipv4.ip_forward=1
 echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
@@ -32,9 +30,9 @@ echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
 iptables -t nat -A POSTROUTING -o $isp1_interface -j MASQUERADE
 iptables -t nat -A POSTROUTING -o $isp2_interface -j MASQUERADE
 
-iptables -t mangle -A PREROUTING -s $lan_subnet -m conntrack ! --ctstate NEW -m connmark ! --mark 0 -j CONNMARK --restore-mark
+iptables -t mangle -A PREROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0 -j CONNMARK --restore-mark
 iptables -t mangle -A PREROUTING -s $lan_subnet -p tcp --dport 80 -m conntrack --ctstate NEW -m connmark --mark 0 -j MARK --set-mark 251
-iptables -t mangle -A PREROUTING -s $lan_subnet -p icmp --icmp-type echo-request -m connmark --mark 0 -j MARK --set-mark 251
+iptables -t mangle -A PREROUTING -p icmp --icmp-type echo-request -m connmark --mark 0 -j MARK --set-mark 251
 iptables -t mangle -A PREROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
 }
 status(){
