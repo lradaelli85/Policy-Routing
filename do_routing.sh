@@ -7,34 +7,34 @@
 
 flush_routing_tables(){
 #isp1
-ip route flush table $routing_table1
-ip rule del from $isp1_ip table $routing_table1
-ip rule del fwmark 251 table $routing_table1
+ip route flush table $gw1_routing_table
+ip rule del from $gw1_interface_ip table $gw1_routing_table
+ip rule del fwmark $gw1_mark table $gw1_routing_table
 #isp2
-ip rule del from $isp2_ip table $routing_table2
-ip route flush table $routing_table2
-ip rule del fwmark 252 table $routing_table2
+ip rule del from $gw2_interface_ip table $gw2_routing_table
+ip route flush table $gw2_routing_table
+ip rule del fwmark $gw2_mark table $gw2_routing_table
 #lookup in main table when destination is local
-ip rule del prio 10 to $lan_subnet lookup main
+ip rule del to $lan_subnet lookup main
 
 
 }
 
 add_routing_rules(){
 #isp1
-ip route add $isp1_network dev $isp1_interface src $isp1_ip table $routing_table1
-ip route add default via $isp1_gw table $routing_table1
-ip rule add from $isp1_ip table $routing_table1 prio 200
+ip route add $gw1_network dev $gw1_interface src $gw1_interface_ip table $gw1_routing_table
+ip route add default via $gw1_next_hop_ip table $gw1_routing_table
+ip rule add from $gw1_interface_ip table $gw1_routing_table prio 200
 #isp2
-ip route add $isp2_network dev $isp2_interface src $isp2_ip table $routing_table2
-ip route add default via $isp2_gw table $routing_table2
-ip rule add from $isp2_ip table $routing_table2 prio 200
+ip route add $gw2_network dev $gw2_interface src $gw2_interface_ip table $gw2_routing_table
+ip route add default via $gw2_next_hop_ip table $gw2_routing_table
+ip rule add from $gw2_interface_ip table $gw2_routing_table prio 200
 #route through isp1 traffic marked with 251
-ip rule add fwmark 251 table $routing_table1  prio 199
+ip rule add fwmark $gw1_mark table $gw1_routing_table prio 199
 #route through isp2 traffic marked with 252
-ip rule add fwmark 252 table $routing_table2  prio 199
+ip rule add fwmark $gw2_mark table $gw2_routing_table prio 199
 #lookup in main table when destination is local
-ip rule add prio 10 to $lan_subnet lookup main
+ip rule add to $lan_subnet lookup main prio 10
 
 }
 
@@ -58,33 +58,32 @@ fi
 echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
 }
 
-add_local_routing_rules(){
-ip rule add fwmark 250 table $routing_table2  prio 199
-}
-
-del_local_routing_rules(){
-ip rule del fwmark 250 table $routing_table2  prio 199
-}
 
 add_local_iptables_rules(){
-iptables -t mangle -N LOCAL_ROUTING
-iptables -t mangle -A LOCAL_ROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0 -j CONNMARK --restore-mark
-local_user_rules
-iptables -t mangle -A LOCAL_ROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
-iptables -t mangle -A OUTPUT -j LOCAL_ROUTING
+if [ $local_routing -eq 1 ]
+        then
+            iptables -t mangle -N LOCAL_ROUTING
+            iptables -t mangle -A LOCAL_ROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0 -j CONNMARK --restore-mark
+            user_rules LOCAL_ROUTING
+            iptables -t mangle -A LOCAL_ROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
+            iptables -t mangle -A OUTPUT -j LOCAL_ROUTING
+fi
 }
 
 del_local_iptables_rules(){
-iptables -t mangle -D OUTPUT -j LOCAL_ROUTING
-iptables -t mangle -F LOCAL_ROUTING
-iptables -t mangle -X LOCAL_ROUTING
+if [ $local_routing -eq 1 ]
+        then
+            iptables -t mangle -D OUTPUT -j LOCAL_ROUTING
+            iptables -t mangle -F LOCAL_ROUTING
+            iptables -t mangle -X LOCAL_ROUTING
+fi
 }
 
 add_nat(){
 if [ $nat_enabled -eq  1 ]
     then
-        iptables -t nat -A POSTROUTING -o $isp1_interface -j MASQUERADE
-        iptables -t nat -A POSTROUTING -o $isp2_interface -j MASQUERADE
+        iptables -t nat -A POSTROUTING -o $gw1_interface -j MASQUERADE
+        iptables -t nat -A POSTROUTING -o $gw2_interface -j MASQUERADE
 fi
 }
 
@@ -92,51 +91,42 @@ add_iptables_rules(){
 iptables -t mangle -N ROUTING
 iptables -t mangle -A PREROUTING -j ROUTING
 iptables -t mangle -A ROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0  -j CONNMARK --restore-mark
-not_local_user_rules
+user_rules ROUTING
 iptables -t mangle -A ROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
 }
 
 del_iptables_rules(){
 if [ $nat_enabled -eq  1 ]
     then
-        iptables -t nat -D POSTROUTING -o $isp1_interface -j MASQUERADE
-        iptables -t nat -D POSTROUTING -o $isp2_interface -j MASQUERADE
+        iptables -t nat -D POSTROUTING -o $gw1_interface -j MASQUERADE
+        iptables -t nat -D POSTROUTING -o $gw2_interface -j MASQUERADE
 fi
 iptables -t mangle -D PREROUTING -j ROUTING
 iptables -t mangle -F ROUTING
 iptables -t mangle -X ROUTING
 }
 
-local_user_rules(){
-./local_routing.sh
-}
-
-not_local_user_rules(){
-./non_local_routing.sh
+user_rules(){
+./routing_rule.py $1
 }
 
 stop(){
-if [ $local_routing -eq 1 ]
-    then
-       del_local_iptables_rules
-       del_local_routing_rules
-fi
+del_local_iptables_rules
 flush_routing_tables
 del_iptables_rules
 disable_kernel_parameters
-
-
 }
 
 start(){
-if [ $local_routing -eq 1 ]
-    then
-       add_local_iptables_rules
-       add_local_routing_rules
-fi
+#echo "start add_local_iptables_rules"
+add_local_iptables_rules
+#echo "start add nat"
 add_nat
+#echo "start kernel"
 enable_kernel_parameters
+#echo "start iptables"
 add_iptables_rules
+#echo "start routing"
 add_routing_rules
 }
 
@@ -150,13 +140,13 @@ fi
 
 status(){
 echo "="
-echo "routing table $routing_table1:"
+echo "routing table $gw1_routing_table:"
 echo "="
-ip r s t $routing_table1
+ip r s t $gw1_routing_table
 echo "="
-echo "routing table $routing_table2:"
+echo "routing table $gw2_routing_table:"
 echo "="
-ip r s t $routing_table2
+ip r s t $gw2_routing_table
 echo "="
 ip rule ls
 echo "="
@@ -166,8 +156,11 @@ echo "="
 echo "="
 iptables -t mangle -nvL ROUTING
 echo "="
-echo "="
-iptables -t mangle -nvL LOCAL_ROUTING
+if [ $local_routing -eq 1 ]
+    then
+        echo "="
+        iptables -t mangle -nvL LOCAL_ROUTING
+fi
 }
 
 case $1 in
