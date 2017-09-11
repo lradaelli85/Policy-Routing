@@ -63,9 +63,9 @@ add_local_iptables_rules(){
 if [ $local_routing -eq 1 ]
         then
             iptables -t mangle -N LOCAL_ROUTING
-            iptables -t mangle -A LOCAL_ROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0 -j CONNMARK --restore-mark
+            #iptables -t mangle -A LOCAL_ROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0 -j CONNMARK --restore-mark
             user_rules LOCAL_ROUTING
-            iptables -t mangle -A LOCAL_ROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
+            #iptables -t mangle -A LOCAL_ROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
             iptables -t mangle -A OUTPUT -j LOCAL_ROUTING
 fi
 }
@@ -89,10 +89,10 @@ fi
 
 add_iptables_rules(){
 iptables -t mangle -N ROUTING
+iptables -t mangle -A PREROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0  -j CONNMARK --restore-mark
 iptables -t mangle -A PREROUTING -j ROUTING
-iptables -t mangle -A ROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0  -j CONNMARK --restore-mark
 user_rules ROUTING
-iptables -t mangle -A ROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
+iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
 }
 
 del_iptables_rules(){
@@ -101,9 +101,12 @@ if [ $nat_enabled -eq  1 ]
         iptables -t nat -D POSTROUTING -o $gw1_interface -j MASQUERADE
         iptables -t nat -D POSTROUTING -o $gw2_interface -j MASQUERADE
 fi
+iptables -t mangle -D PREROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0  -j CONNMARK --restore-mark
 iptables -t mangle -D PREROUTING -j ROUTING
 iptables -t mangle -F ROUTING
 iptables -t mangle -X ROUTING
+iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
+
 }
 
 user_rules(){

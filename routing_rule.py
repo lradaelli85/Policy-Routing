@@ -17,10 +17,13 @@ def get_gw_mark():
     return marks
 
 def add_rule(chain,rule,mark):
-    rule = 'iptables -t mangle -A {} {} -m mark --mark 0 -j MARK --set-mark {}'.format(chain,rule,mark)
-    out = Command(rule).run()
-    if out != 0:
-        print 'error running \n{}'.format(rule)
+    rules = []
+    rules.append('iptables -t mangle -A {} {} -m mark --mark 0 -j MARK --set-mark {}'.format(chain,rule,mark))
+    rules.append('iptables -t mangle -A {} {}  -m mark ! --mark 0 -j RETURN'.format(chain,rule))
+    for r in rules:
+        out = Command(r).run()
+        if out != 0:
+            print 'error running \n{}'.format(r)
 
 def get_rules(chain):
     local_chain = ''
