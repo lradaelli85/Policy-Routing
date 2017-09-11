@@ -16,8 +16,10 @@ ip route flush table $gw2_routing_table
 ip rule del fwmark $gw2_mark table $gw2_routing_table
 #lookup in main table when destination is local
 ip rule del to $lan_subnet lookup main
-
-
+if [ $loadbalance -eq 0 ]
+then
+ip route replace default scope global nexthop via $gw1_next_hop_ip dev $gw1_interface
+fi
 }
 
 add_routing_rules(){
@@ -35,7 +37,17 @@ ip rule add fwmark $gw1_mark table $gw1_routing_table prio 199
 ip rule add fwmark $gw2_mark table $gw2_routing_table prio 199
 #lookup in main table when destination is local
 ip rule add to $lan_subnet lookup main prio 10
-
+if [ $loadbalance -eq 1 ]
+then
+if [ $gw1_weight -gt $gw2_weight ]
+then
+ip route replace default scope global nexthop via $gw1_next_hop_ip dev $gw1_interface weight $gw1_weight \
+nexthop via $gw2_next_hop_ip dev $gw2_interface weight $gw2_weight
+else
+ip route replace default scope global nexthop via $gw2_next_hop_ip dev $gw2_interface weight $gw2_weight \
+nexthop via $gw1_next_hop_ip dev $gw1_interface weight $gw1_weight
+fi
+fi
 }
 
 disable_kernel_parameters(){
@@ -63,9 +75,7 @@ add_local_iptables_rules(){
 if [ $local_routing -eq 1 ]
         then
             iptables -t mangle -N LOCAL_ROUTING
-            #iptables -t mangle -A LOCAL_ROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0 -j CONNMARK --restore-mark
             user_rules LOCAL_ROUTING
-            #iptables -t mangle -A LOCAL_ROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
             iptables -t mangle -A OUTPUT -j LOCAL_ROUTING
 fi
 }
@@ -92,6 +102,8 @@ iptables -t mangle -N ROUTING
 iptables -t mangle -A PREROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0  -j CONNMARK --restore-mark
 iptables -t mangle -A PREROUTING -j ROUTING
 user_rules ROUTING
+iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $gw1_interface -j MARK --set-mark $gw1_mark
+iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $gw2_interface -j MARK --set-mark $gw2_mark
 iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
 }
 
@@ -105,6 +117,8 @@ iptables -t mangle -D PREROUTING -m conntrack ! --ctstate NEW -m connmark ! --ma
 iptables -t mangle -D PREROUTING -j ROUTING
 iptables -t mangle -F ROUTING
 iptables -t mangle -X ROUTING
+iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $gw1_interface -j MARK --set-mark $gw1_mark
+iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $gw2_interface -j MARK --set-mark $gw2_mark
 iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
 
 }
