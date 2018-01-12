@@ -99,6 +99,7 @@ fi
 
 add_iptables_rules(){
 iptables -t mangle -N ROUTING
+iptables -t mangle -A ROUTING  -m mark ! --mark 0 -j RETURN
 iptables -t mangle -A PREROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0  -j CONNMARK --restore-mark
 iptables -t mangle -A PREROUTING -j ROUTING
 user_rules ROUTING
