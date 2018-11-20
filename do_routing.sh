@@ -1,70 +1,67 @@
 #!/bin/bash
-#LOCAL MARK 250
-#ISP1 MARK 251
-#ISP2 MARK 252
 
 . network.conf
 
 flush_routing_tables(){
-#isp1
-ip route flush table $gw1_routing_table
-ip rule del from $gw1_interface_ip table $gw1_routing_table
-ip rule del fwmark $gw1_mark table $gw1_routing_table
-#isp2
-ip rule del from $gw2_interface_ip table $gw2_routing_table
-ip route flush table $gw2_routing_table
-ip rule del fwmark $gw2_mark table $gw2_routing_table
+#wan1
+ip route flush table $wan1_routing_table
+ip rule del from $wan1_ip_address table $wan1_routing_table
+ip rule del fwmark $wan1_mark table $wan1_routing_table
+
+#wan2
+ip rule del from $wan2_ip_address table $wan2_routing_table
+ip route flush table $wan2_routing_table
+ip rule del fwmark $wan2_mark table $wan2_routing_table
+
 #lookup in main table when destination is local
-ip rule del to $lan_subnet lookup main
+#ip rule del to $lan_subnet lookup main
+
 if [ $loadbalance -eq 0 ]
-then
-ip route replace default scope global nexthop via $gw1_next_hop_ip dev $gw1_interface
+  then
+    ip route replace default scope global nexthop via $wan1_gateway dev $wan1_interface
 fi
 }
 
 add_routing_rules(){
-#isp1
-ip route add $gw1_network dev $gw1_interface src $gw1_interface_ip table $gw1_routing_table
-ip route add default via $gw1_next_hop_ip table $gw1_routing_table
-ip rule add from $gw1_interface_ip table $gw1_routing_table prio 200
-#isp2
-ip route add $gw2_network dev $gw2_interface src $gw2_interface_ip table $gw2_routing_table
-ip route add default via $gw2_next_hop_ip table $gw2_routing_table
-ip rule add from $gw2_interface_ip table $gw2_routing_table prio 200
-#route through isp1 traffic marked with 251
-ip rule add fwmark $gw1_mark table $gw1_routing_table prio 199
-#route through isp2 traffic marked with 252
-ip rule add fwmark $gw2_mark table $gw2_routing_table prio 199
+#wan1
+ip route add $wan1_network_address dev $wan1_interface src $wan1_ip_address table $wan1_routing_table
+ip route add default via $wan1_gateway table $wan1_routing_table
+ip rule add from $wan1_ip_address table $wan1_routing_table prio 199
+
+#wan2
+ip route add $wan2_network_address dev $wan2_interface src $wan2_ip_address table $wan2_routing_table
+ip route add default via $wan2_gateway table $wan2_routing_table
+ip rule add from $wan2_ip_address table $wan2_routing_table prio 200
+
+#route through wan1 traffic marked with 1
+ip rule add fwmark $wan1_mark table $wan1_routing_table prio 199
+
+#route through wan2 traffic marked with 2
+ip rule add fwmark $wan2_mark table $wan2_routing_table prio 200
+
 #lookup in main table when destination is local
-ip rule add to $lan_subnet lookup main prio 10
-if [ $loadbalance -eq 1 ]
-then
-if [ $gw1_weight -gt $gw2_weight ]
-then
-ip route replace default scope global nexthop via $gw1_next_hop_ip dev $gw1_interface weight $gw1_weight \
-nexthop via $gw2_next_hop_ip dev $gw2_interface weight $gw2_weight
-else
-ip route replace default scope global nexthop via $gw2_next_hop_ip dev $gw2_interface weight $gw2_weight \
-nexthop via $gw1_next_hop_ip dev $gw1_interface weight $gw1_weight
-fi
-fi
+#ip rule add to $lan_subnet lookup main prio 10
+
 }
 
 disable_kernel_parameters(){
+
 #disable forwarding
 if [ $forwarding_enabled -eq 1 ]
-        then
-            sysctl -w net.ipv4.ip_forward=0
+  then
+    sysctl -w net.ipv4.ip_forward=0
 fi
+
 #enable reverse path filter
 echo 1 > /proc/sys/net/ipv4/conf/all/rp_filter
 }
 
 enable_kernel_parameters(){
+
 #enable forwarding
 if [ $forwarding_enabled -eq 1 ]
-        then
-            sysctl -w net.ipv4.ip_forward=1
+  then
+    sysctl -w net.ipv4.ip_forward=1
 fi
 #disable reverse path filter
 echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
@@ -73,54 +70,56 @@ echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
 
 add_local_iptables_rules(){
 if [ $local_routing -eq 1 ]
-        then
-            iptables -t mangle -N LOCAL_ROUTING
-            user_rules LOCAL_ROUTING
-            iptables -t mangle -A OUTPUT -j LOCAL_ROUTING
+  then
+    iptables -t mangle -N LOCAL_ROUTING
+    user_rules LOCAL_ROUTING
+    iptables -t mangle -A OUTPUT -j LOCAL_ROUTING
 fi
 }
 
 del_local_iptables_rules(){
 if [ $local_routing -eq 1 ]
-        then
-            iptables -t mangle -D OUTPUT -j LOCAL_ROUTING
-            iptables -t mangle -F LOCAL_ROUTING
-            iptables -t mangle -X LOCAL_ROUTING
+  then
+    iptables -t mangle -D OUTPUT -j LOCAL_ROUTING
+    iptables -t mangle -F LOCAL_ROUTING
+    iptables -t mangle -X LOCAL_ROUTING
 fi
 }
 
 add_nat(){
 if [ $nat_enabled -eq  1 ]
-    then
-        iptables -t nat -A POSTROUTING -o $gw1_interface -j MASQUERADE
-        iptables -t nat -A POSTROUTING -o $gw2_interface -j MASQUERADE
+  then
+    iptables -t nat -A POSTROUTING -o $wan1_interface -j MASQUERADE
+    iptables -t nat -A POSTROUTING -o $wan2_interface -j MASQUERADE
 fi
 }
 
 add_iptables_rules(){
 iptables -t mangle -N ROUTING
-iptables -t mangle -A ROUTING  -m mark ! --mark 0 -j RETURN
+#iptables -t mangle -A ROUTING  -m mark ! --mark 0 -j RETURN
 iptables -t mangle -A PREROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0  -j CONNMARK --restore-mark
 iptables -t mangle -A PREROUTING -j ROUTING
 user_rules ROUTING
-iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $gw1_interface -j MARK --set-mark $gw1_mark
-iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $gw2_interface -j MARK --set-mark $gw2_mark
-iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
+iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $wan1_interface -j CONNMARK --set-mark $wan1_mark
+iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $wan2_interface -j CONNMARK --set-mark $wan2_mark
+iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -o $wan1_interface -j CONNMARK --save-mark
+iptables -t mangle -A POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -o $wan2_interface -j CONNMARK --save-mark
 }
 
 del_iptables_rules(){
 if [ $nat_enabled -eq  1 ]
-    then
-        iptables -t nat -D POSTROUTING -o $gw1_interface -j MASQUERADE
-        iptables -t nat -D POSTROUTING -o $gw2_interface -j MASQUERADE
+  then
+    iptables -t nat -D POSTROUTING -o $wan1_interface -j MASQUERADE
+    iptables -t nat -D POSTROUTING -o $wan2_interface -j MASQUERADE
 fi
 iptables -t mangle -D PREROUTING -m conntrack ! --ctstate NEW -m connmark ! --mark 0  -j CONNMARK --restore-mark
 iptables -t mangle -D PREROUTING -j ROUTING
 iptables -t mangle -F ROUTING
 iptables -t mangle -X ROUTING
-iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $gw1_interface -j MARK --set-mark $gw1_mark
-iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $gw2_interface -j MARK --set-mark $gw2_mark
-iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -j CONNMARK --save-mark
+iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $wan1_interface -j CONNMARK --set-mark $wan1_mark
+iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark --mark 0 -o $wan2_interface -j CONNMARK --set-mark $wan2_mark
+iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -o $wan1_interface -j CONNMARK --save-mark
+iptables -t mangle -D POSTROUTING -m conntrack --ctstate NEW -m mark ! --mark 0 -o $wan2_interface -j CONNMARK --save-mark
 
 }
 
@@ -150,21 +149,21 @@ add_routing_rules
 
 Who_Am_I(){
 if [ `id -u` -ne 0 ]
-    then
-        echo "need root privileges"
-        exit 1;
+  then
+    echo "need root privileges"
+    exit 1;
 fi
 }
 
 status(){
 echo "="
-echo "routing table $gw1_routing_table:"
+echo "routing table $wan1_routing_table:"
 echo "="
-ip r s t $gw1_routing_table
+ip r s t $wan1_routing_table
 echo "="
-echo "routing table $gw2_routing_table:"
+echo "routing table $wan2_routing_table:"
 echo "="
-ip r s t $gw2_routing_table
+ip r s t $wan2_routing_table
 echo "="
 ip rule ls
 echo "="
@@ -175,9 +174,9 @@ echo "="
 iptables -t mangle -nvL ROUTING
 echo "="
 if [ $local_routing -eq 1 ]
-    then
-        echo "="
-        iptables -t mangle -nvL LOCAL_ROUTING
+  then
+    echo "="
+    iptables -t mangle -nvL LOCAL_ROUTING
 fi
 }
 

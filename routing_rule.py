@@ -19,7 +19,7 @@ def get_gw_mark():
 def add_rule(chain,rule,mark):
     rules = []
     rules.append('iptables -t mangle -A {} {} -m mark --mark 0 -j MARK --set-mark {}'.format(chain,rule,mark))
-    rules.append('iptables -t mangle -A {} {}  -m mark ! --mark 0 -j RETURN'.format(chain,rule))
+    rules.append('iptables -t mangle -A {} {} -m mark ! --mark 0 -j RETURN'.format(chain,rule))
     for r in rules:
         out = Command(r).run()
         if out != 0:
