@@ -1,34 +1,87 @@
 # Policy-Routing
--REQUIREMENTS
 
-iproute2
-iptables
+bash script to handle policy routing
 
--INSTRUCTIONS
+# SCENARIO
 
-add two (if you have two ISP connections) routing tables in /etc/iproute2/rt_tables
-i.e
+This is a common scenario where you can use this script
 
-251     isp1
-252     isp2
+```
+                                                                
+                                          +------------+       |                                          
+                                          |            |       |
+                            +-------------+    ISP 1   +-------|
+                            |             |            |       |
+                     +------+-------+     +------------+       |
+                     |     eth0     |                          |
+                     |              |                          |
+ Local network ------+    Router    |                          | INTERNET 
+                     |              |                          |
+                     |     eth2     |                          |
+                     +------+-------+     +------------+       |
+                            |             |            |       |
+                            +-------------+    ISP 2   +-------|
+                                          |            |       |
+                                          +------------+       | 
+```
 
-Edit the network.conf file change parameters in the first section accordingly to your configuration
-Add the iptables rules to mark the desired traffic in the below flush_routing_tables
+# REQUIREMENTS
 
--local_routing.sh
-This file should be used only to route locally generated traffic.
+- iproute2
+- iptables
 
--non_local_routing.sh
-This file should be used only to route non locally generated traffic (i.e if the linux box act as a router and you want to redirect traffic from hosts
-that are using it as gateway).
+# INSTRUCTIONS
 
-Use mark 250 for locally generated traffic,mark 252 for traffic routed through ISP2,and mark 251 for traffic routed through ISP1
+add two (if you have two ISP connections) routing tables in /etc/iproute2/rt_tables.
+In this example i added table 251 and 252
 
+```
+#
+# reserved values
+#
+255	local
+254	main
+253	default
+252     wan2
+251     wan1
+0	unspec
+#
+# local
+#
+#1	inr.ruhep
+```
 
-#USAGE
+Edit the `policy-routing.conf` file and change the parameters in the first section accordingly to your configuration
+Specify the traffic that you want to route in the routing_rules.cfg file.
+For example,if you want to route all HTTP traffic coming from 192.168.122.0/24 network through the second ISP add:
 
-you'll find a bash script ,that will do what i mentioned above.
-All parameters are read from a configuration file called network.conf.
+```
+[rule1]
+src-ip =
+src-net = 192.168.122.0/24
+src-interface =
+protocol = tcp
+dst-port = 80
+dst-ip = 
+dst-net =
+gw = wan2
+routing_type = routing
+```
+
+Note that the routing rules has to be added with the above exact syntax,you always have to specify in the first line `[ruleN]` where N is an incremental integer
+
+# USAGE
+
 You need only to run the script from a root terminal in this way
 
-./do_routing.sh start
+`./policy-routing.sh start`
+
+To have some informations about run
+
+`./policy-routing.sh status`
+
+# CREDITS
+
+took the inspiration from here:
+
+https://www.tldp.org/HOWTO/Adv-Routing-HOWTO/lartc.rpdb.multiple-links.html

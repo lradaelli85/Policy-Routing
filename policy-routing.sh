@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. network.conf
+. policy-routing.conf
 
 flush_routing_tables(){
 #wan1
@@ -42,6 +42,11 @@ ip rule add fwmark $wan2_mark table $wan2_routing_table prio 200
 #lookup in main table when destination is local
 #ip rule add to $lan_subnet lookup main prio 10
 
+if [ $loadbalance -eq 1 ]
+ then
+   ./load-balance.sh
+fi
+  
 }
 
 disable_kernel_parameters(){
@@ -135,15 +140,10 @@ disable_kernel_parameters
 }
 
 start(){
-#echo "start add_local_iptables_rules"
 add_local_iptables_rules
-#echo "start add nat"
 add_nat
-#echo "start kernel"
 enable_kernel_parameters
-#echo "start iptables"
 add_iptables_rules
-#echo "start routing"
 add_routing_rules
 }
 
@@ -156,28 +156,36 @@ fi
 }
 
 status(){
-echo "="
+clear
+echo " "
 echo "routing table $wan1_routing_table:"
-echo "="
+echo "==================================="
 ip r s t $wan1_routing_table
-echo "="
+echo " "
+echo " "
 echo "routing table $wan2_routing_table:"
-echo "="
+echo "==================================="
 ip r s t $wan2_routing_table
-echo "="
+echo " "
+echo " "
+echo "ip rule rules"
+echo "==================================="
 ip rule ls
-echo "="
-echo "="
-iptables -t nat -nvL POSTROUTING
-echo "="
-echo "="
-iptables -t mangle -nvL ROUTING
-echo "="
+echo " "
+echo " "
+echo "iptables mark rules"
+echo "==================================="
+iptables -t mangle -vL ROUTING
 if [ $local_routing -eq 1 ]
   then
-    echo "="
+    echo " "
     iptables -t mangle -nvL LOCAL_ROUTING
 fi
+echo " "
+echo " "
+echo "main routing table"
+echo "===================================="
+ip route ls
 }
 
 case $1 in

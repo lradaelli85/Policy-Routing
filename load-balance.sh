@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. network.conf
+. policy-routing.conf
 
 if [ $loadbalance -eq 1 ]
 then

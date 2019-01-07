@@ -10,7 +10,7 @@ parsed_value = {'src-ip' : '-s','src-net' : '-s', 'src-interface' : '-i',
 
 def get_gw_mark():
     marks = {}
-    with open('network.conf','r') as f:
+    with open('policy-routing.conf','r') as f:
         for line in f:
             if line.split('=')[0].endswith('_mark'):
                 marks[line.split('=')[0].split('_')[0]] = line.split('=')[1].replace('\"','')
@@ -27,7 +27,7 @@ def add_rule(chain,rule,mark):
 
 def get_rules(chain):
     local_chain = ''
-    cfg_handler = ConfigHandler('routing.cfg')
+    cfg_handler = ConfigHandler('routing_rules.cfg')
     rules = cfg_handler.get_sections()
     marks = get_gw_mark()
     for rule in rules:
